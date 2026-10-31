@@ -13,6 +13,81 @@
   <link rel="preload" as="image" href="bg.png" fetchpriority="high">
   <link href="https://fonts.googleapis.com/css2?family=Stack+Sans+Text:wght@300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script>
+    (() => {
+      const preferenceKey = "glacial-umami-opt-out";
+      const websiteId = "6a71fb6b-75b0-4136-85cb-6be6f17dae25";
+      let optedOut;
+
+      try {
+        optedOut = localStorage.getItem(preferenceKey) === "true";
+      } catch {
+        optedOut = true;
+      }
+
+      window.glacialUmamiBeforeSend = (type, payload) => {
+        if (optedOut || type !== "pageview") return false;
+        if (payload) {
+          delete payload.referrer;
+          delete payload.screen;
+          delete payload.language;
+        }
+        return payload;
+      };
+
+      function loadUmami() {
+        if (optedOut || document.querySelector("[data-umami-tracker]")) return;
+
+        const script = document.createElement("script");
+        script.async = true;
+        script.src = "https://cloud.umami.is/script.js";
+        script.dataset.websiteId = websiteId;
+        script.dataset.excludeSearch = "true";
+        script.dataset.excludeHash = "true";
+        script.dataset.doNotTrack = "true";
+        script.dataset.beforeSend = "glacialUmamiBeforeSend";
+        script.dataset.umamiTracker = "";
+        document.head.append(script);
+      }
+
+      function updateToggle(button) {
+        const enabled = !optedOut;
+        button.setAttribute("aria-pressed", String(enabled));
+        button.textContent = enabled ? "Analytics on" : "Analytics off";
+        button.title = enabled
+          ? "Anonymous page views only. Click to opt out."
+          : "Analytics are off. Click to opt in.";
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const button = document.querySelector("#analytics-toggle");
+        updateToggle(button);
+
+        button.addEventListener("click", () => {
+          const nextOptedOut = !optedOut;
+          try {
+            localStorage.setItem(preferenceKey, String(nextOptedOut));
+          } catch {
+            optedOut = true;
+            updateToggle(button);
+            return;
+          }
+
+          optedOut = nextOptedOut;
+          updateToggle(button);
+
+          if (optedOut) return;
+          if (document.querySelector("[data-umami-tracker]")) {
+            window.umami?.track?.();
+          } else {
+            loadUmami();
+          }
+        });
+      });
+
+      loadUmami();
+    })();
+  </script>
 </head>
 
 <body>
@@ -26,6 +101,7 @@
 
   <header class="site-header">
     <img class="logo" src="logo.svg" alt="glacial" width="56" height="56">
+    <button class="analytics-toggle" id="analytics-toggle" type="button" aria-pressed="true">Analytics on</button>
   </header>
 
   <main id="main" class="hero">
